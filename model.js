@@ -1,4 +1,5 @@
 function Model(config){
+  var klass;
   // Initialize the new function
     if(config.init){
         klass = config.init;
