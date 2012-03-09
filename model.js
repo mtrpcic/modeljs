@@ -50,4 +50,4 @@ function Model(config){
     }
     return klass;
 }
-Model.version = "0.2";
+Model.version = "0.2.1";
