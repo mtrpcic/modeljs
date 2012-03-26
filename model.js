@@ -16,7 +16,11 @@ function Model(config){
     for(method_name in config.classMethods){
         klass[method_name] = config.classMethods[method_name];
     }
-    klass.prototype = config.instanceMethods;
+
+    // Assign instance methods
+    if(config.instanceMethods){
+        klass.prototype = config.instanceMethods;   
+    }
     
     // Set up caching methods
     if(config.cacheKey){
@@ -24,7 +28,7 @@ function Model(config){
         klass._fetch = config.classMethods.fetch;
         klass.instances = {};
 
-        if(!config.instanceMethods.save){
+        if(!config.instanceMethods || (config.instanceMethods && !config.instanceMethods.save)){
             klass.prototype.save = function(fn){
                 klass.cache(this);
                 if(fn) fn(this);
@@ -40,14 +44,19 @@ function Model(config){
                 klass._fetch(key, callback);
             } else {
                 instance = klass.instances[key];
-                if(instance){
-                    callback(instance)
+
+                if(callback){
+                    if(instance){
+                        callback(instance)
+                    } else {
+                        klass._fetch(key, callback);
+                    }   
                 } else {
-                    klass._fetch(key, callback);
+                    return instance || null;
                 }
             }
         }
     }
     return klass;
 }
-Model.version = "0.2.1";
+Model.version = "0.3.0";

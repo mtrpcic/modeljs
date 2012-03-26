@@ -84,6 +84,12 @@ call the class level `cache` method to insert your instance into the cache.
         cacheKey: "id"
     });
 
+If your application is not trying to maintain state with a remote server, you may not need to use a
+callback.  If this is the case, you can call fetch _without a second argument_, and get an instance
+back immediately.  If your instance isn't available in the cache, this method will return null.
+
+    User.fetch(10); // Returns an instance or null immediately - no callback required
+
 # To Do #
 * Add a way for an instance to "invalidate" itself and remove itself from the cache
 * Add a way to turn an entire array of objects into an entire array of instances with one call
