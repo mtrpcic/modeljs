@@ -60,6 +60,7 @@ your callbacks into AJAX calls, so you can asynchronously fetch remote data.
 **Static Methods**  
 Your class gets two methods, `fetch` and `cache`.  The `fetch` method is used to retrieve instances of your
 model from the cache.
+
 ```javascript
 Class.fetch(key, callback, skip_cache);
 
@@ -138,6 +139,7 @@ var Admin = User.extend({
     cacheKey: ""
 });
 ```
+
 Your new model will have all the instance and static methods of the parent class, except where you have explicitly
 overridden them.  If you want access to an instance method from the parent class, you can access it via the `parent`
 attribute of your instance:
