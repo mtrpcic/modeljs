@@ -24,7 +24,7 @@ function Model(config, parent_klass){
     // Assign instance methods
     Model.util.apply(config.methods, klass.prototype);
 
-    // Manage caching methods
+    // Set up caching methods
     if(config.cacheKey){
         klass.cacheKey = config.cacheKey;
         klass.instances = {};
@@ -52,7 +52,7 @@ Model.util = {
             destination[item] = host[item];
         }
     }
-}
+};
 
 Model.core = {
     init: function(attributes){
@@ -100,6 +100,5 @@ Model.core = {
             return new Model(config, klass);
         }
     }
-}
-
+};
 Model.version = "0.4.0";
