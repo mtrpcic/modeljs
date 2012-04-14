@@ -1,52 +1,105 @@
-function Model(config){
-  // Initialize the new function
-    if(config.init){
-        klass = config.init;
-    } else {
-        klass = function(attributes){
-            this.attributes = attributes;
-            for(attribute in attributes){
-                this[attribute] = attributes[attribute];
-            }
-        }
+function Model(config, parent_klass){
+    // Define the init method for the new class
+    var klass = function(attributes){
+        var fn = (config.init ? config.init : Model.core.init);
+        fn.call(this, attributes);
+
+        // If this is an extended class, the "parent class" can be
+        // accessed via the `parent` attribute
+        if(parent_klass){
+            this.parent = new parent_klass(attributes);
+        }   
     }
 
-    // Assign class methods
-    for(method_name in config.classMethods){
-        klass[method_name] = config.classMethods[method_name];
+    // Assign all methods/statics of the parent class to this class
+    if(parent_klass){
+        parent_klass.call(klass);
+        Model.util.apply(parent_klass, klass);
+        Model.util.apply(parent_klass.prototype, klass.prototype);
     }
-    klass.prototype = config.instanceMethods;
-    
-    // Set up caching methods
+
+    // Assign static attributes
+    Model.util.apply(config.statics, klass);
+
+    // Assign instance methods
+    Model.util.apply(config.methods, klass.prototype);
+
+    // Manage caching methods
     if(config.cacheKey){
         klass.cacheKey = config.cacheKey;
-        klass._fetch = config.classMethods.fetch;
         klass.instances = {};
 
-        if(!config.instanceMethods.save){
-            klass.prototype.save = function(fn){
-                klass.cache(this);
-                if(fn) fn(this);
-            }
+        if(config.statics && config.statics.fetch){
+            klass._fetch = config.statics.fetch;
+        } else {
+            throw "ModelJS Error: You must define a custom `fetch` method when defining a cacheKey";
         }
 
-        klass.cache = function(instance){
-            klass.instances[instance[klass.cacheKey]] = instance;
+        if(!config.methods || (config.methods && !config.methods.save)){
+            klass.prototype.save = Model.core.save(klass);
         }
 
-        klass.fetch = function(key, callback, force){
-            if(force){
-                klass._fetch(key, callback);
-            } else {
-                instance = klass.instances[key];
-                if(instance){
-                    callback(instance)
-                } else {
-                    klass._fetch(key, callback);
-                }
-            }
-        }
+        klass.cache = Model.core.cache(klass);
+        klass.fetch = Model.core.fetch(klass);
+        klass.extend = Model.core.extend(klass);
     }
     return klass;
 }
-Model.version = "0.2";
+
+Model.util = {
+    "apply": function(host, destination){
+        for(item in host){
+            destination[item] = host[item];
+        }
+    }
+}
+
+Model.core = {
+    init: function(attributes){
+        this.attributes = attributes;
+        for(attribute in attributes){
+            this[attribute] = attributes[attribute];
+        }
+    },
+    fetch: function(klass){
+        return function(key, callback, skip_cache){
+            if(skip_cache){
+                klass._fetch(key, callback);
+            } else {
+                instance = klass.instances[String(key)];
+
+                if(callback){
+                    if(instance){
+                        callback(instance)
+                    } else {
+                        klass._fetch(key, callback);
+                    }
+                } else {
+                    return instance || null;
+                }
+            }
+        }
+    },
+    cache: function(klass){
+        return function(instance){
+            key = instance[klass.cacheKey];
+            if(key instanceof Function){
+                key = instance[klass.cacheKey]();
+            }
+            klass.instances[String(key)] = instance;
+        };
+    },
+    save: function(klass){
+        return function(callback){
+            klass.cache(this);
+            if(callback) callback(this);
+        };
+    },
+    extend: function(klass){
+        return function(config){
+            return new Model(config, klass);
+        }
+    }
+}
+
+Model.version = "0.4.0";

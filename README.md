@@ -1,96 +1,163 @@
-# ModelJS #
-ModelJS provides a convenient, lightweight way for developers to convert their standard JSON objects
-into models with instance methods, attributes, and class methods.  It supports basiccaching, and uses
-a callback system to allow models to be used in conjunction with asynchronous AJAX calls.
+# ModelJS
+ModelJS is a lightweight model implementation written in Javascript.  It supports static methods and
+properties, instance methods, rudimentary caching, and more.
 
-# Creating a Model #
-Creating a model is easy.  The model definition takes a configuration object, and looks for four
-specific keys.  `init` defines the initializer method for your object.  If `init` is not provided,
-ModelJS will use a default initializer for you, which will turn every key in your attribute object
-into an instance attribute of your model. The  `instanceMethods` and `classMethods` options define 
-instance and class level methods, respectively.  The fourth option, `cacheKey`, is discussed below
-in the "Caching" section.
+## Defining a Model
 
-    var User = new Model({
-        init: function(attributes){
-            this.id = attributes.id;
-            this.name = attributes.name;
-        },
-        instanceMethods: {
-            sayHello: function(){
-                console.log("Hello from " + this.name);
-            }
-        },
-        classMethods: {
-            sayGoodbye: function(){
-                console.log("Goodbye everyone!");
-            }
+Defining a model is easy.  The model definition takes a configuration object which can provide
+four keys for customizing your model:
+
+```javascript
+var User = new Model({
+    init: function(attributes){}, // Define a custom init method
+    methods: {},                  // Define any instance methods you want
+    statics: {},                  // Add any static methods/properties you want
+    cacheKey: ""                  // Set up caching (read the "Caching" section below)
+});
+```
+If you don't specify a custom init method, ModelJS will use a default one for you, which will turn every
+key in your `attributes` object into a property of your model instance. A fairly well defined `User` model
+might look like:
+
+```javascript
+var User = new Model({
+    methods: {
+        full_name: function(){
+            return this.first_name + " " + this.last_name;
         }
-    });
+    },
+    statics: {
+        count: 4,
+        alert: function(message){
+            // Send the message to all users!
+        }
+    },
+    cacheKey: "id"
+});
+```
+## Using Your Models
 
-# Using your Model #
-You use your model instances the same as you would any other object:
+ModelJS expects that your model instances are initialized with an "attributes object".  You can create and 
+use a new model instance by doing:
 
-    var mike = new User({id: 1, name: "Mike"});
+```javascript
+var mike = new User({id: 1, first_name: "Mike", last_name: "Trpcic"});
 
-    console.log(mike.name);
-    mike.sayHello();
-    User.sayGoodbye();
+mike.full_name(); // returns "Mike Trpcic"
+mike.id // returns 1
+```
 
-# Caching #
-Model.js supports a basic level of caching.  If you pass the `cacheKey` property in
-when defining your model, it will be given two additional class methods, and all instances
-will be given an addition instance method:
+## Caching
 
-    var User = new Model({cacheKey: "id"});
-    var mike = new User({id: 1, name: "Mike"});
+Model.js supports a basic level of caching. If you provide the `cacheKey` property when defining your model,
+the model will be given two additional static methods, as well as one instance method.  If your `cacheKey`
+property maps to a defined instance method, ModelJS will use the return value of that method as the key for
+caching purposes.
 
-    User.fetch(key, callback, skip_cache);
-    User.cache(instance)
+The ModelJS caching system makes heavy use of callback methods.  This is intentional, and allows you to pass
+your callbacks into AJAX calls, so you can asynchronously fetch remote data.
 
-    mike.save(callback);
+**Static Methods**  
+Your class gets two methods, `fetch` and `cache`.  The `fetch` method is used to retrieve instances of your
+model from the cache.
+```javascript
+Class.fetch(key, callback, skip_cache);
 
-The `cacheKey` property must be an attribute of your model.  For example, if your user model
-has an `id` attribute (as per the example above), you can set the `cacheKey` to `id`. This
-field should be unique, otherwise you will have an invalid cache.
+  // key        => The key that is used to store your object in the cache.
+                   This is usually the "cacheKey" property of your instance.
+  // callback   => The callback method that will be called and passed your found instance.
+  // skip_cache => Tells this fetch request to skip the cache entirely.
+```
 
-The model gets the class method `fetch`  This takes three arguments.  First is the key to
-fetch the instance by.  The second, `callback` is the callback that will be called with your instance
-passed as the only parameter, and the third option, `skip_cache`, will tell the model to skip
-the cache entirely for this fetch.
+When using the caching system, you will need to tell ModelJS where to find instances that it does not already
+have access to.  You do this by defining your own custom `fetch` method:
 
-You can override the fetch method in your `classMethods` definition.  This method should be used
-to retrieve an instance of your model from your server.  If a `cacheKey` is set, it will attempt
-to load the cached version, but will fall back to your fetch method if no instance is found.
+```javascript
+var User = new Model({
+    statics: {
+        fetch: function(key, callback){
+            // Implement your custom fetch code here.  This example uses jQuery.
+            $.get("/user", {user_id: key}, callback);
+        }
+    },
+    cacheKey: "id"
+});
+```
 
-The model also gets the `cache` class method, which takes in an instance of the model as a parameter.
-This method will insert that instance into the class cache, using your defined `cacheKey` attribute
-as the key.
+The `cache` method is used to insert an instance into the cache.  Simply call the method and pass it a model
+instance, and it will be inserted into the cache:
 
-All instancesof your class will get the "save" method.  By default, this method only calls the class 
-`cache` method.  You can override this class to do anything you want, but you will need to manually 
-call the class level `cache` method to insert your instance into the cache.
+```javascript
+User.cache(mike);
+```
 
-    var User = new Model({
-        init: function(attributes){
-            this.id = attributes.id;
+**Instance Methods**  
+Every instance of your model will have a default `save` method.  By default, this method only inserts the instance
+into the appropriate cache.  In some cases however, you may want to override the default save function (for example,
+to push changes to the server).  In this case, you can define an instance method called `save`.  Be careful though!
+If you override this method, you will have to _manually_ insert your object into the cache by calling the `Class.cache`
+method mentioned above.
+
+```javascript
+// Using the default method
+function userSaved(instance){
+    console.log(instance.full_name() + " saved!");
+}
+mike.save(userSaved);
+
+
+// using a custom method
+var User = new Model({
+    methods: {
+        save: function(callback){
+            // This example uses jQuery
+            $.post("/save_user", {}, callback);
+            User.cache(this); // Don't forget to manually save this instance to the cache!
         },
-        instanceMethods: {
-    
-        },
-        classMethods: {
-    
-        },
-        cacheKey: "id"
-    });
+        full_name: function(){
+            return this.first_name + " " + this.last_name;
+        }
+    },
+    cacheKey: "id"
+});
 
-# To Do #
+var mike = new User({id: 1, first_name: "Mike", last_name: "Trpcic"});
+mike.save(userSaved);
+```
+
+## Inheritance
+
+ModelJS supports inheritance via the `extend` method.  This method takes in a configuration block in the same
+way that a new model definition does:
+
+```javascript
+var Admin = User.extend({
+    init: function(attributes){},
+    methods: {},
+    statics: {},
+    cacheKey: ""
+});
+```
+Your new model will have all the instance and static methods of the parent class, except where you have explicitly
+overridden them.  If you want access to an instance method from the parent class, you can access it via the `parent`
+attribute of your instance:
+
+```javascript
+var admin = new Admin({...});
+
+admin.full_name(); // Call the 'full_name' method of the admin class
+admin.parent.full_name(); // Call the 'full_name' method of the parent class (User, in this case)
+```
+
+## To Do
+
 * Add a way for an instance to "invalidate" itself and remove itself from the cache
 * Add a way to turn an entire array of objects into an entire array of instances with one call
 * Add a way to fetch multiple instances of a class at once
-* Get community ideas
+* Add a test suite
 
-# Pull Requests #
+## Pull Requests
+
 To make a pull request, please do the following:
 
 * Mention what specific version of ModelJS you were using when you encountered the issue/added the feature. This can be accessed by doing Model.version in a console
@@ -98,10 +165,12 @@ To make a pull request, please do the following:
 * Make sure you update the minified version of the source as well
 * Do **not** modify the `Model.version` attribute.  I will modify that manually when merging the request
 
-# Disclaimer #
+## Disclaimer
+
 This code is provided without warranty.  While I strive to maintain backwards compatibility with previous versions,
 the code is still under active development.  As this is the case, some revisions may break compatibility with earlier
 versions of the library.  Please keep this in mind when using ModelJS.
 
-# Copyright and Licensing #
+## Copyright and Licensing
+
 Copyright (c) 2012 Mike Trpcic, released under the MIT license
