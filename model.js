@@ -45,8 +45,8 @@ function Model(config, parent_klass){
 
         klass.cache = Model.core.cache(klass);
         klass.fetch = Model.core.fetch(klass);
-        klass.extend = Model.core.extend(klass);
     }
+    klass.extend = Model.core.extend(klass);
     return klass;
 }
 
@@ -105,4 +105,4 @@ Model.core = {
         }
     }
 };
-Model.version = "0.4.1";
+Model.version = "0.4.2";
