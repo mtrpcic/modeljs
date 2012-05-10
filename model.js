@@ -1,7 +1,12 @@
 function Model(config, parent_klass){
     // Define the init method for the new class
     var klass = function(attributes){
-        var fn = (config.init ? config.init : Model.core.init);
+        if(parent_klass){
+            var fn = (config.init ? config.init : parent_klass);    
+        } else {
+            var fn = (config.init ? config.init : Model.core.init);
+        }
+        
         fn.call(this, attributes);
 
         // If this is an extended class, the "parent class" can be
@@ -13,7 +18,6 @@ function Model(config, parent_klass){
 
     // Assign all methods/statics of the parent class to this class
     if(parent_klass){
-        parent_klass.call(klass);
         Model.util.apply(parent_klass, klass);
         Model.util.apply(parent_klass.prototype, klass.prototype);
     }
@@ -101,4 +105,4 @@ Model.core = {
         }
     }
 };
-Model.version = "0.4.0";
+Model.version = "0.4.1";
